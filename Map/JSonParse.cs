@@ -47,7 +47,6 @@ namespace Map
 			{
 				while (index < polylinechars.Length)
 				{
-					// calculate next latitude
 					sum = 0;
 					shifter = 0;
 					do
@@ -62,7 +61,6 @@ namespace Map
 
 					currentLat += (sum & 1) == 1 ? ~(sum >> 1) : (sum >> 1);
 
-					//calculate next longitude
 					sum = 0;
 					shifter = 0;
 					do

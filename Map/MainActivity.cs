@@ -8,6 +8,8 @@ using Android.Gms.Maps.Model;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.IO;
+using Java.IO;
 
 
 namespace Map
@@ -15,6 +17,9 @@ namespace Map
 	[Activity (Label = "Map", MainLauncher = true, Icon = "@mipmap/icon")]
 	public class MainActivity : Activity , ILocationListener
 	{
+		public static List<Stop> Stops;
+		public static List<StopTime> StopTimes;
+		public static List<Bus> Buses;
 		GoogleMap map;
 		Location currentLoc;
 		LocationManager locationManager;
@@ -24,12 +29,25 @@ namespace Map
 		{
 			base.OnCreate (savedInstanceState);
 			SetContentView (Resource.Layout.Main);
+			RepositoryDB DB = new RepositoryDB ();
+			CopyDataBase (DB.PathDataBase);
+			Stops = DB.GetItems<Stop> ();
+			Buses = DB.GetItems<Bus> ();
+			StopTimes = DB.GetItems<StopTime> ();
 			SetUpLocManager ();
 			SetUpMap ();
 
 		}
-
-
+		private void PutMarkers()
+		{
+			foreach (var stop in Stops) {
+				var marker = new MarkerOptions ();
+				marker.SetTitle (stop.Name+" ID "+stop.ID.ToString());
+				marker.SetPosition (new LatLng (stop.Latitude, stop.Longitude));
+				marker.SetIcon (BitmapDescriptorFactory.FromResource(Resource.Drawable.bus));
+				map.AddMarker (marker);
+			}
+		}
 		private void SetUpMap ()
 		{
 			var frag = FragmentManager.FindFragmentById<MapFragment> (Resource.Id.map); 
@@ -64,31 +82,36 @@ namespace Map
 			map.MyLocationEnabled = true;
 			map.UiSettings.MyLocationButtonEnabled = true;
 			map.UiSettings.ZoomControlsEnabled = true;
-			DrawPath ();
-		}
+			PutMarkers ();
+			List<Stop> fff = new List<Stop> ();
+			fff.Add (Stops [0]);
+			fff.Add (Stops [2]);
+			fff.Add (Stops [40]);
+			fff.Add (Stops [18]);
+			fff.Add (Stops [12]);
+			fff.Add (Stops [28]);
 
+
+			DrawPath (fff);
+		}
 		public void OnLocationChanged (Android.Locations.Location location)
 		{
 			if(currentLoc==null)
 			 map.AnimateCamera (CameraUpdateFactory.NewLatLngZoom(new LatLng(location.Latitude,location.Longitude),15f));
 			currentLoc = location;
 		}
-
 		public void OnProviderDisabled (string provider)
 		{
 		}
-
 		public void OnProviderEnabled (string provider)
 		{
 		}
-
 		public void OnStatusChanged (string provider, Availability status, Bundle extras)
 		{
 		}
-
-		async public void DrawPath ()
+		async public void DrawPath (List<Stop> stops)
 		{
-			string strFullDirectionURL = await HttpConnection.CreateUri ();
+			string strFullDirectionURL = await HttpConnection.CreateUri (stops);
 			string strJSONDirectionResponse = await HttpConnection.HttpRequest (strFullDirectionURL);
 			if (strJSONDirectionResponse != "") {
 				RunOnUiThread (() => { 
@@ -104,11 +127,9 @@ namespace Map
 				polylineoption.InvokeWidth (5);
 				currentLine = map.AddPolyline (polylineoption);
 			} else {
-				RunOnUiThread (() =>
-					Toast.MakeText (this, "Невозможно проложить маршрут", ToastLength.Short).Show ()); 
+					Toast.MakeText (this, "Невозможно проложить маршрут", ToastLength.Short).Show (); 
 			}	
 		}
-
 		protected override void OnResume()
 		{
 			base.OnResume();
@@ -119,14 +140,35 @@ namespace Map
 			locationManager.RemoveUpdates(this);
 
 		}
+		public void CopyDataBase(string path)
+		{
+			byte[] buffer = new byte[2048];
+			Stream myInput = null;
+			int length=2048;
+			OutputStream myOutput = null;
+			try
+			{
+				myInput =Assets.Open("DB.sqlite");
+				myOutput =new FileOutputStream(path);
+				while((length = myInput.Read(buffer,0,length)) > 0)
+				{
+					myOutput.Write(buffer, 0, length);
+				}
+				myOutput.Close();
+				myOutput.Flush();
+				myInput.Close();
+			}
+			catch
+			{
+			}
+		}
+
 	}
 
 	public class OnMapReadyClass :Java.Lang.Object,IOnMapReadyCallback
 	{
 		public GoogleMap Map { get; private set; }
-
 		public event Action<GoogleMap> MapReadyAction;
-
 		public void OnMapReady (GoogleMap googleMap)
 		{
 			Map = googleMap;
